@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/services/storage_service.dart';
 import 'package:zad_mobile/features/downloads/download_model.dart';
-import 'package:zad_mobile/features/downloads/download_manager.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/library/library_screen.dart';
 
 class DownloadsScreen extends StatefulWidget {
@@ -15,160 +17,151 @@ class DownloadsScreen extends StatefulWidget {
 class _DownloadsScreenState extends State<DownloadsScreen> {
   String? _expandedSemester;
   String? _expandedCourse;
-  double _storageUsedMb = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStorageInfo();
-  }
-
-  Future<void> _loadStorageInfo() async {
-    final used = await StorageService.instance.getTotalStorageUsedMb();
-    if (mounted) {
-      setState(() => _storageUsedMb = used);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final grouped = StorageService.instance.getGroupedDownloads();
-    final maxGb = StorageService.instance.getMaxStorageGb();
-    final usedPercent = _storageUsedMb / (maxGb * 1024);
+    return BlocBuilder<DownloadsCubit, DownloadsState>(
+      builder: (context, state) {
+        final grouped = state.groupedDownloads;
+        final maxGb = state.maxStorageGb;
+        final storageUsedMb = state.storageUsedMb;
+        final usedPercent = state.usedPercentage;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppConstants.bgDark,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppConstants.textMuted.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          builder: (sheetContext, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppConstants.bgDark,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppConstants.textMuted.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
 
-              // Header
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.download_rounded,
-                      color: AppConstants.secondaryColor,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'إدارة التنزيلات',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppConstants.textLight,
-                        ),
-                      ),
-                    ),
-                    // Open full library
-                    IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const LibraryScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.open_in_full_rounded,
-                        color: AppConstants.primaryLight,
-                      ),
-                      tooltip: 'المكتبة الكاملة',
-                    ),
-                  ],
-                ),
-              ),
-
-              // Storage usage bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
-                        Text(
-                          'المساحة المستخدمة: ${StorageService.instance.formatStorageUsed(_storageUsedMb)}',
-                          style: const TextStyle(
-                            color: AppConstants.textMuted,
-                            fontSize: 12,
+                        const Icon(
+                          Icons.download_rounded,
+                          color: AppConstants.secondaryColor,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'إدارة التنزيلات',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppConstants.textLight,
+                            ),
                           ),
                         ),
-                        Text(
-                          'الحد: ${maxGb.toStringAsFixed(0)} ج.ب',
-                          style: const TextStyle(
-                            color: AppConstants.textMuted,
-                            fontSize: 12,
+                        // Open full library
+                        IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LibraryScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.open_in_full_rounded,
+                            color: AppConstants.primaryLight,
+                          ),
+                          tooltip: 'المكتبة الكاملة',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Storage usage bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'المساحة المستخدمة: ${StorageService.instance.formatStorageUsed(storageUsedMb)}',
+                              style: const TextStyle(
+                                color: AppConstants.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              'الحد: ${maxGb.toStringAsFixed(0)} ج.ب',
+                              style: const TextStyle(
+                                color: AppConstants.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: usedPercent,
+                            minHeight: 6,
+                            backgroundColor:
+                                AppConstants.textMuted.withValues(alpha: 0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              usedPercent > 0.9
+                                  ? Colors.redAccent
+                                  : AppConstants.primaryLight,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: usedPercent.clamp(0, 1),
-                        minHeight: 6,
-                        backgroundColor:
-                            AppConstants.textMuted.withValues(alpha: 0.2),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          usedPercent > 0.9
-                              ? Colors.redAccent
-                              : AppConstants.primaryLight,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Divider(
-                color: AppConstants.cardDark,
-                height: 1,
-              ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(
+                    color: AppConstants.cardDark,
+                    height: 1,
+                  ),
 
-              // Content
-              Expanded(
-                child: grouped.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: grouped.length,
-                        itemBuilder: (context, index) {
-                          final semester = grouped.keys.elementAt(index);
-                          final courses = grouped[semester]!;
-                          return _buildSemesterTile(
-                            semester,
-                            courses,
-                          );
-                        },
-                      ),
+                  // Content
+                  Expanded(
+                    child: grouped.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: grouped.length,
+                            itemBuilder: (ctx, index) {
+                              final semester = grouped.keys.elementAt(index);
+                              final courses = grouped[semester]!;
+                              return _buildSemesterTile(
+                                semester,
+                                courses,
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -391,9 +384,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         child: const Icon(Icons.delete_rounded, color: Colors.redAccent),
       ),
       onDismissed: (_) async {
-        await StorageService.instance.deleteDownload(item.id);
-        _loadStorageInfo();
-        setState(() {});
+        await context.read<DownloadsCubit>().deleteDownload(item.id);
       },
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16)
@@ -428,13 +419,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               ),
             if (item.status == DownloadStatus.running)
               Expanded(
-                child: LinearProgressIndicator(
-                  value: item.progress / 100,
-                  minHeight: 3,
-                  backgroundColor:
-                      AppConstants.textMuted.withValues(alpha: 0.2),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppConstants.primaryLight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: item.progress / 100,
+                      minHeight: 4,
+                      backgroundColor:
+                          AppConstants.textMuted.withValues(alpha: 0.2),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppConstants.primaryLight,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -505,8 +502,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       case DownloadStatus.failed:
         return IconButton(
           onPressed: () async {
-            await DownloadManager.instance.retryDownload(item.taskId);
-            setState(() {});
+            await context.read<DownloadsCubit>().retryDownload(item.taskId);
           },
           icon: const Icon(
             Icons.refresh_rounded,
@@ -547,9 +543,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'حذف $semester',
       'سيتم حذف جميع الملفات المحملة لهذا السمستر نهائياً. متأكد؟',
       () async {
-        await StorageService.instance.deleteSemester(semester);
-        _loadStorageInfo();
-        setState(() {});
+        await context.read<DownloadsCubit>().deleteSemester(semester);
       },
     );
   }
@@ -559,9 +553,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'حذف $course',
       'سيتم حذف جميع ملفات هذا المقرر نهائياً. متأكد؟',
       () async {
-        await StorageService.instance.deleteCourse(semester, course);
-        _loadStorageInfo();
-        setState(() {});
+        await context.read<DownloadsCubit>().deleteCourse(semester, course);
       },
     );
   }

@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:zad_mobile/app/constants.dart';
-import 'package:zad_mobile/shared/services/storage_service.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/downloads/download_model.dart';
 import 'package:zad_mobile/features/library/video_player_screen.dart';
 import 'package:zad_mobile/features/library/audio_player_screen.dart';
@@ -17,13 +19,11 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  List<DownloadItem> _completedFiles = [];
   FileCategory? _filterCategory;
 
   @override
   void initState() {
     super.initState();
-    _loadFiles();
     // If we have an initial file, open it after build
     if (widget.initialFile != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -32,83 +32,81 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
-  void _loadFiles() {
-    final all = StorageService.instance.getAllDownloads();
-    setState(() {
-      _completedFiles = all
-          .where((d) => d.status == DownloadStatus.complete)
-          .toList();
-    });
-  }
-
-  List<DownloadItem> get _filteredFiles {
-    if (_filterCategory == null) return _completedFiles;
-    return _completedFiles
-        .where((f) => f.category == _filterCategory)
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: AppConstants.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppConstants.cardDark,
-          foregroundColor: AppConstants.textLight,
-          elevation: 0,
-          title: const Text(
-            'المكتبة المحلية',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          centerTitle: true,
-          actions: [
-            PopupMenuButton<FileCategory?>(
-              icon: const Icon(Icons.filter_list_rounded),
-              color: AppConstants.cardDark,
-              onSelected: (category) {
-                setState(() => _filterCategory = category);
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: null,
-                  child: Text('الكل',
-                      style: TextStyle(color: AppConstants.textLight)),
-                ),
-                const PopupMenuItem(
-                  value: FileCategory.video,
-                  child: Text('فيديو',
-                      style: TextStyle(color: AppConstants.textLight)),
-                ),
-                const PopupMenuItem(
-                  value: FileCategory.audio,
-                  child: Text('صوت',
-                      style: TextStyle(color: AppConstants.textLight)),
-                ),
-                const PopupMenuItem(
-                  value: FileCategory.pdf,
-                  child: Text('PDF',
-                      style: TextStyle(color: AppConstants.textLight)),
-                ),
-                const PopupMenuItem(
-                  value: FileCategory.youtube,
-                  child: Text('يوتيوب',
-                      style: TextStyle(color: AppConstants.textLight)),
-                ),
-                const PopupMenuItem(
-                  value: FileCategory.document,
-                  child: Text('مستندات',
-                      style: TextStyle(color: AppConstants.textLight)),
+    return BlocBuilder<DownloadsCubit, DownloadsState>(
+      builder: (context, state) {
+        final completedFiles = state.allDownloads
+            .where((d) => d.status == DownloadStatus.complete)
+            .toList();
+
+        final filteredFiles = _filterCategory == null
+            ? completedFiles
+            : completedFiles
+                .where((f) => f.category == _filterCategory)
+                .toList();
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            backgroundColor: AppConstants.bgDark,
+            appBar: AppBar(
+              backgroundColor: AppConstants.cardDark,
+              foregroundColor: AppConstants.textLight,
+              elevation: 0,
+              title: const Text(
+                'المكتبة المحلية',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              centerTitle: true,
+              actions: [
+                PopupMenuButton<FileCategory?>(
+                  icon: const Icon(Icons.filter_list_rounded),
+                  color: AppConstants.cardDark,
+                  onSelected: (category) {
+                    setState(() => _filterCategory = category);
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: null,
+                      child: Text('الكل',
+                          style: TextStyle(color: AppConstants.textLight)),
+                    ),
+                    const PopupMenuItem(
+                      value: FileCategory.video,
+                      child: Text('فيديو',
+                          style: TextStyle(color: AppConstants.textLight)),
+                    ),
+                    const PopupMenuItem(
+                      value: FileCategory.audio,
+                      child: Text('صوت',
+                          style: TextStyle(color: AppConstants.textLight)),
+                    ),
+                    const PopupMenuItem(
+                      value: FileCategory.pdf,
+                      child: Text('PDF',
+                          style: TextStyle(color: AppConstants.textLight)),
+                    ),
+                    const PopupMenuItem(
+                      value: FileCategory.youtube,
+                      child: Text('يوتيوب',
+                          style: TextStyle(color: AppConstants.textLight)),
+                    ),
+                    const PopupMenuItem(
+                      value: FileCategory.document,
+                      child: Text('مستندات',
+                          style: TextStyle(color: AppConstants.textLight)),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        body: _filteredFiles.isEmpty
-            ? _buildEmptyState()
-            : _buildFileGrid(),
-      ),
+            body: filteredFiles.isEmpty
+                ? _buildEmptyState()
+                : _buildFileGrid(filteredFiles),
+          ),
+        );
+      },
     );
   }
 
@@ -145,13 +143,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
-  Widget _buildFileGrid() {
+  Widget _buildFileGrid(List<DownloadItem> files) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: _filteredFiles.length,
+      itemCount: files.length,
       separatorBuilder: (context, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final item = _filteredFiles[index];
+        final item = files[index];
         return _buildFileCard(item);
       },
     );
@@ -218,8 +216,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             size: 20,
           ),
           onPressed: () async {
-            await StorageService.instance.deleteDownload(item.id);
-            _loadFiles();
+            await context.read<DownloadsCubit>().deleteDownload(item.id);
           },
         ),
       ),
@@ -286,7 +283,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         color = Colors.red;
         break;
       case FileCategory.document:
-        label = 'مستند';
+        label = 'مستندات';
         color = Colors.tealAccent;
         break;
       case FileCategory.other:
@@ -302,7 +299,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+        style:
+            TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
       ),
     );
   }

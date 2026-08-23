@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
@@ -14,6 +15,10 @@ class DownloadManager {
 
   final ReceivePort _port = ReceivePort();
   final ValueNotifier<List<DownloadItem>> activeDownloads = ValueNotifier([]);
+  final StreamController<DownloadItem> _downloadUpdateController =
+      StreamController<DownloadItem>.broadcast();
+
+  Stream<DownloadItem> get downloadUpdates => _downloadUpdateController.stream;
 
   Future<void> init() async {
     await FlutterDownloader.initialize(debug: false, ignoreSsl: true);
@@ -85,6 +90,9 @@ class DownloadManager {
       totalBytes: bytes > 0 ? bytes : item.totalBytes,
     );
     storage.updateDownload(updated);
+
+    // Broadcast update to Cubit and listeners
+    _downloadUpdateController.add(updated);
 
     // Refresh active downloads
     _refreshActiveDownloads();
@@ -176,6 +184,7 @@ class DownloadManager {
     if (taskId != null) {
       final updatedItem = item.copyWith(taskId: taskId);
       await storage.saveDownload(updatedItem);
+      _downloadUpdateController.add(updatedItem);
       _refreshActiveDownloads();
     }
   }
@@ -208,6 +217,7 @@ class DownloadManager {
     );
 
     await storage.saveDownload(item);
+    _downloadUpdateController.add(item);
     _refreshActiveDownloads();
   }
 
@@ -222,7 +232,9 @@ class DownloadManager {
       final storage = StorageService.instance;
       final item = storage.findByTaskId(taskId);
       if (item != null) {
-        await storage.updateDownload(item.copyWith(taskId: newTaskId));
+        final updated = item.copyWith(taskId: newTaskId, status: DownloadStatus.enqueued, progress: 0);
+        await storage.updateDownload(updated);
+        _downloadUpdateController.add(updated);
       }
     }
   }
@@ -244,6 +256,7 @@ class DownloadManager {
   void dispose() {
     IsolateNameServer.removePortNameMapping('downloader_send_port');
     _port.close();
+    _downloadUpdateController.close();
   }
 }
 

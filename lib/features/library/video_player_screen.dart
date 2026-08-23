@@ -1,9 +1,12 @@
-import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:zad_mobile/app/constants.dart';
+import 'package:zad_mobile/features/library/cubit/video_player_cubit.dart';
+import 'package:zad_mobile/features/library/cubit/video_player_state.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String? filePath;
@@ -22,15 +25,12 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  VideoPlayerController? _videoController;
   YoutubePlayerController? _youtubeController;
-  bool _isInitialized = false;
-  bool _showControls = true;
 
   @override
   void initState() {
     super.initState();
-    // Lock to landscape for video
+    // Allow landscape and portrait
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeRight,
       DeviceOrientation.landscapeLeft,
@@ -39,23 +39,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     if (widget.youtubeVideoId != null) {
       _initYouTube();
-    } else if (widget.filePath != null) {
-      _initLocalVideo();
     }
-  }
-
-  void _initLocalVideo() {
-    _videoController = VideoPlayerController.file(File(widget.filePath!))
-      ..initialize().then((_) {
-        setState(() => _isInitialized = true);
-        _videoController!.play();
-      }).catchError((e) {
-        debugPrint('VideoPlayer error: $e');
-      });
-
-    _videoController!.addListener(() {
-      if (mounted) setState(() {});
-    });
   }
 
   void _initYouTube() {
@@ -67,168 +51,51 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         enableCaption: true,
       ),
     );
-    setState(() => _isInitialized = true);
   }
 
   @override
   void dispose() {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    _videoController?.dispose();
     _youtubeController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        appBar: _showControls
-            ? AppBar(
-                backgroundColor: Colors.black.withValues(alpha: 0.7),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                title: Text(
-                  widget.title,
-                  style: const TextStyle(fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                centerTitle: true,
-              )
-            : null,
-        body: GestureDetector(
-          onTap: () => setState(() => _showControls = !_showControls),
-          child: Center(
-            child: !_isInitialized
-                ? const CircularProgressIndicator(
-                    color: AppConstants.primaryLight,
-                  )
-                : widget.youtubeVideoId != null
-                    ? _buildYouTubePlayer()
-                    : _buildLocalPlayer(),
+    if (widget.youtubeVideoId != null) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black.withValues(alpha: 0.7),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            title: Text(
+              widget.title,
+              style: const TextStyle(fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            centerTitle: true,
+          ),
+          body: Center(
+            child: _buildYouTubePlayer(),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLocalPlayer() {
-    if (_videoController == null || !_videoController!.value.isInitialized) {
-      return const CircularProgressIndicator(
-        color: AppConstants.primaryLight,
       );
     }
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        AspectRatio(
-          aspectRatio: _videoController!.value.aspectRatio,
-          child: VideoPlayer(_videoController!),
-        ),
-        if (_showControls)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.8),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Progress bar
-                  VideoProgressIndicator(
-                    _videoController!,
-                    allowScrubbing: true,
-                    colors: const VideoProgressColors(
-                      playedColor: AppConstants.primaryLight,
-                      bufferedColor: AppConstants.textMuted,
-                      backgroundColor: Colors.white24,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Controls
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Time elapsed
-                      Text(
-                        _formatDuration(_videoController!.value.position),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const Spacer(),
-                      // Rewind 10s
-                      IconButton(
-                        icon: const Icon(Icons.replay_10_rounded,
-                            color: Colors.white, size: 28),
-                        onPressed: () {
-                          final pos = _videoController!.value.position;
-                          _videoController!.seekTo(
-                            pos - const Duration(seconds: 10),
-                          );
-                        },
-                      ),
-                      // Play/Pause
-                      IconButton(
-                        icon: Icon(
-                          _videoController!.value.isPlaying
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_filled,
-                          color: Colors.white,
-                          size: 48,
-                        ),
-                        onPressed: () {
-                          _videoController!.value.isPlaying
-                              ? _videoController!.pause()
-                              : _videoController!.play();
-                        },
-                      ),
-                      // Forward 10s
-                      IconButton(
-                        icon: const Icon(Icons.forward_10_rounded,
-                            color: Colors.white, size: 28),
-                        onPressed: () {
-                          final pos = _videoController!.value.position;
-                          _videoController!.seekTo(
-                            pos + const Duration(seconds: 10),
-                          );
-                        },
-                      ),
-                      const Spacer(),
-                      // Duration
-                      Text(
-                        _formatDuration(_videoController!.value.duration),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
+    return BlocProvider(
+      create: (_) => VideoPlayerCubit()..init(widget.filePath!),
+      child: _LocalVideoPlayerView(title: widget.title),
     );
   }
 
   Widget _buildYouTubePlayer() {
+    if (_youtubeController == null) {
+      return const CircularProgressIndicator(color: AppConstants.primaryLight);
+    }
     return YoutubePlayer(
       controller: _youtubeController!,
       showVideoProgressIndicator: true,
@@ -236,6 +103,248 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       progressColors: const ProgressBarColors(
         playedColor: AppConstants.primaryLight,
         handleColor: AppConstants.secondaryColor,
+      ),
+    );
+  }
+}
+
+class _LocalVideoPlayerView extends StatelessWidget {
+  final String title;
+
+  const _LocalVideoPlayerView({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<VideoPlayerCubit, VideoPlayerState>(
+      builder: (context, state) {
+        final cubit = context.read<VideoPlayerCubit>();
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => cubit.toggleControls(),
+              child: Center(
+                child: !state.isInitialized || cubit.controller == null
+                    ? const CircularProgressIndicator(
+                        color: AppConstants.primaryLight,
+                      )
+                    : Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Video stream
+                          Center(
+                            child: AspectRatio(
+                              aspectRatio: state.aspectRatio,
+                              child: VideoPlayer(cubit.controller!),
+                            ),
+                          ),
+
+                          // Top AppBar (when controls visible)
+                          if (state.showControls)
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => cubit.userInteracted(),
+                                child: Container(
+                                  padding: EdgeInsets.only(
+                                    top: MediaQuery.of(context).padding.top + 8,
+                                    left: 16,
+                                    right: 16,
+                                    bottom: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.85),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.arrow_back,
+                                            color: Colors.white),
+                                        onPressed: () =>
+                                            Navigator.maybePop(context),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // Bottom Controls overlay
+                          if (state.showControls)
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => cubit.userInteracted(),
+                                child: _buildControlsOverlay(context, state, cubit),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildControlsOverlay(
+    BuildContext context,
+    VideoPlayerState state,
+    VideoPlayerCubit cubit,
+  ) {
+    final durationMs = max(1.0, state.duration.inMilliseconds.toDouble());
+    final positionMs = state.displayPosition.inMilliseconds
+        .toDouble()
+        .clamp(0.0, durationMs);
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 24,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.black.withValues(alpha: 0.9),
+            Colors.transparent,
+          ],
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Scrubbing Slider inside LTR Directionality for precise coordinates
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: AppConstants.primaryLight,
+                inactiveTrackColor: Colors.white24,
+                thumbColor: AppConstants.secondaryColor,
+                overlayColor: AppConstants.primaryLight.withValues(alpha: 0.2),
+                trackHeight: 4,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 7,
+                  pressedElevation: 6,
+                ),
+              ),
+              child: Slider(
+                value: positionMs,
+                min: 0.0,
+                max: durationMs,
+                onChangeStart: (val) {
+                  cubit.onDragStart(
+                    Duration(milliseconds: val.toInt()),
+                  );
+                },
+                onChanged: (val) {
+                  cubit.onDragUpdate(
+                    Duration(milliseconds: val.toInt()),
+                  );
+                },
+                onChangeEnd: (val) {
+                  cubit.onDragEnd(
+                    Duration(milliseconds: val.toInt()),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Action Buttons and Time Display
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Elapsed time
+              Text(
+                _formatDuration(state.displayPosition),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              // Rewind 10s
+              IconButton(
+                icon: const Icon(
+                  Icons.replay_10_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                onPressed: () =>
+                    cubit.seekRelative(const Duration(seconds: -10)),
+              ),
+              const SizedBox(width: 8),
+              // Play/Pause
+              IconButton(
+                icon: Icon(
+                  state.isPlaying
+                      ? Icons.pause_circle_filled
+                      : Icons.play_circle_filled,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                onPressed: () => cubit.togglePlay(),
+              ),
+              const SizedBox(width: 8),
+              // Forward 10s
+              IconButton(
+                icon: const Icon(
+                  Icons.forward_10_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                onPressed: () =>
+                    cubit.seekRelative(const Duration(seconds: 10)),
+              ),
+              const Spacer(),
+              // Total duration
+              Text(
+                _formatDuration(state.duration),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

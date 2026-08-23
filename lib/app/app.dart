@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zad_mobile/app/constants.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
 
 class ZadApp extends StatelessWidget {
   final Widget home;
@@ -9,21 +11,24 @@ class ZadApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppConstants.appTitle,
-      debugShowCheckedModeBanner: false,
-      locale: const Locale('ar'),
-      supportedLocales: const [
-        Locale('ar'),
-        Locale('en'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      theme: _buildTheme(),
-      home: home,
+    return BlocProvider(
+      create: (context) => DownloadsCubit(),
+      child: MaterialApp(
+        title: AppConstants.appTitle,
+        debugShowCheckedModeBanner: false,
+        locale: const Locale('ar'),
+        supportedLocales: const [
+          Locale('ar'),
+          Locale('en'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: _buildTheme(),
+        home: home,
+      ),
     );
   }
 

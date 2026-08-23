@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/widgets/loading_indicator.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
+import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/downloads/download_manager.dart';
 import 'package:zad_mobile/features/downloads/downloads_screen.dart';
 import 'package:zad_mobile/features/settings/settings_screen.dart';
@@ -182,10 +185,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
               Positioned(
                 bottom: 24,
                 left: 16,
-                child: ValueListenableBuilder<List>(
-                  valueListenable: DownloadManager.instance.activeDownloads,
-                  builder: (context, activeList, _) {
-                    return _buildFloatingButton(activeList.length);
+                child: BlocBuilder<DownloadsCubit, DownloadsState>(
+                  builder: (context, state) {
+                    return _buildFloatingButton(state.activeDownloads.length);
                   },
                 ),
               ),
