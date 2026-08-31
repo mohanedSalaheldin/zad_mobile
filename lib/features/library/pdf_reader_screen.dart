@@ -34,12 +34,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       child: Scaffold(
         backgroundColor: AppConstants.bgDark,
         appBar: AppBar(
-          backgroundColor: AppConstants.cardDark,
-          foregroundColor: AppConstants.textLight,
+          backgroundColor: AppConstants.primaryColor,
+          foregroundColor: Colors.white,
           elevation: 0,
           title: Text(
             widget.title,
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 14, color: Colors.white),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

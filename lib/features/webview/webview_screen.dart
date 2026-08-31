@@ -1,24 +1,20 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/widgets/loading_indicator.dart';
-import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
-import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/downloads/download_manager.dart';
-import 'package:zad_mobile/features/downloads/downloads_screen.dart';
-import 'package:zad_mobile/features/settings/settings_screen.dart';
 import 'package:zad_mobile/features/webview/js_bridge.dart';
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key});
 
   @override
-  State<WebViewScreen> createState() => _WebViewScreenState();
+  State<WebViewScreen> createState() => WebViewScreenState();
 }
 
-class _WebViewScreenState extends State<WebViewScreen> {
+class WebViewScreenState extends State<WebViewScreen>
+    with AutomaticKeepAliveClientMixin {
   InAppWebViewController? _webViewController;
   bool _isLoading = true;
   double _progress = 0;
@@ -26,8 +22,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String _currentCourse = 'المقرر_العام';
   String _currentWeek = 'ملفات';
 
+  /// Reloads the initial login/home URL
+  void loadHomeUrl() {
+    _webViewController?.loadUrl(
+      urlRequest: URLRequest(
+        url: WebUri(AppConstants.loginUrl),
+      ),
+    );
+  }
+
+  // Keep page alive when switching tabs
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -40,7 +50,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: AppConstants.bgDark,
+        backgroundColor: AppConstants.bgLight,
         body: SafeArea(
           child: Stack(
             children: [
@@ -70,7 +80,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 ),
                 onWebViewCreated: (controller) {
                   _webViewController = controller;
-                  // Register JS handler for bridge ready callback
                   controller.addJavaScriptHandler(
                     handlerName: 'onBridgeReady',
                     callback: (args) {
@@ -89,11 +98,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     _isLoading = false;
                     _progress = 1.0;
                   });
-                  // Inject JS bridge
                   await controller.evaluateJavascript(
                     source: JsBridge.contextExtractionScript,
                   );
-                  // Extract course context
                   await _updateCourseContext();
                 },
                 onProgressChanged: (controller, progress) {
@@ -122,18 +129,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     SnackBar(
                       content: Text(
                         'جاري تحميل: $fileName',
-                        style: const TextStyle(fontFamily: 'Cairo'),
+                        style: const TextStyle(color: Colors.white),
                       ),
-                      backgroundColor: AppConstants.primaryColor,
+                      backgroundColor: AppConstants.primaryDark,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       duration: const Duration(seconds: 3),
                       action: SnackBarAction(
-                        label: 'المكتبة',
-                        textColor: AppConstants.secondaryColor,
-                        onPressed: () => _showDownloadsSheet(),
+                        label: 'التنزيلات',
+                        textColor: AppConstants.secondaryLight,
+                        onPressed: () {
+                          // Switch to downloads tab via the parent navigator
+                          _switchToDownloadsTab(context);
+                        },
                       ),
                     ),
                   );
@@ -167,7 +177,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     return NavigationActionPolicy.CANCEL;
                   }
 
-                  // Allow normal navigation within zad-academy.com
                   return NavigationActionPolicy.ALLOW;
                 },
                 onReceivedError: (controller, request, error) {
@@ -180,17 +189,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 isLoading: _isLoading,
                 progress: _progress,
               ),
-
-              // Floating library button
-              Positioned(
-                bottom: 24,
-                left: 16,
-                child: BlocBuilder<DownloadsCubit, DownloadsState>(
-                  builder: (context, state) {
-                    return _buildFloatingButton(state.activeDownloads.length);
-                  },
-                ),
-              ),
             ],
           ),
         ),
@@ -198,65 +196,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  Widget _buildFloatingButton(int activeCount) {
-    return GestureDetector(
-      onTap: _showDownloadsSheet,
-      onLongPress: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SettingsScreen()),
-        );
-      },
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppConstants.primaryColor, AppConstants.primaryLight],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppConstants.primaryColor.withValues(alpha: 0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            const Icon(
-              Icons.library_books_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-            if (activeCount > 0)
-              Positioned(
-                top: 6,
-                right: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: AppConstants.secondaryColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$activeCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+  /// Switches the parent MainNavigationScreen to Downloads tab (index 1)
+  void _switchToDownloadsTab(BuildContext context) {
+    // Walk up to find the BottomNavigationBar scaffold and switch tab
+    final scaffold = context.findAncestorStateOfType<
+        // ignore: invalid_use_of_protected_member
+        State>();
+    if (scaffold != null && scaffold.mounted) {
+      try {
+        // Access MainNavigationScreen's setState via a named method if possible
+        (scaffold as dynamic).switchToDownloads();
+      } catch (_) {}
+    }
   }
 
   Future<void> _updateCourseContext() async {
@@ -267,11 +218,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
       );
       if (result != null) {
         final contextStr = result is String ? result : result.toString();
-        final context = jsonDecode(contextStr) as Map<String, dynamic>;
+        final ctx = jsonDecode(contextStr) as Map<String, dynamic>;
         setState(() {
-          _currentSemester = context['semester']?.toString() ?? 'عام';
-          _currentCourse = context['course']?.toString() ?? 'المقرر_العام';
-          _currentWeek = context['week']?.toString() ?? 'ملفات';
+          _currentSemester = ctx['semester']?.toString() ?? 'عام';
+          _currentCourse = ctx['course']?.toString() ?? 'المقرر_العام';
+          _currentWeek = ctx['week']?.toString() ?? 'ملفات';
         });
         debugPrint(
           'ZadBridge: Context → S:$_currentSemester C:$_currentCourse W:$_currentWeek',
@@ -282,35 +233,26 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
   }
 
-  void _showDownloadsSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => const DownloadsScreen(),
-    );
-  }
-
   void _showExitDialog() {
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          backgroundColor: AppConstants.cardDark,
+          backgroundColor: AppConstants.cardLight,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           title: const Text(
             'الخروج من التطبيق',
             style: TextStyle(
-              color: AppConstants.textLight,
+              color: AppConstants.textDark,
               fontWeight: FontWeight.bold,
             ),
           ),
           content: const Text(
             'هل تريد الخروج من أكاديمية زاد؟',
-            style: TextStyle(color: AppConstants.textLight),
+            style: TextStyle(color: AppConstants.textDark),
           ),
           actions: [
             TextButton(

@@ -35,14 +35,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: AppConstants.bgDark,
+        backgroundColor: AppConstants.bgLight,
         appBar: AppBar(
-          backgroundColor: AppConstants.cardDark,
-          foregroundColor: AppConstants.textLight,
+          backgroundColor: AppConstants.primaryColor,
+          foregroundColor: Colors.white,
           elevation: 0,
           title: const Text(
             'الإعدادات',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           centerTitle: true,
         ),
@@ -54,23 +54,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             _buildCard(
               children: [
-                // Storage usage
                 ListTile(
                   leading: const Icon(
                     Icons.pie_chart_rounded,
-                    color: AppConstants.primaryLight,
+                    color: AppConstants.primaryColor,
                   ),
                   title: const Text(
                     'المساحة المستخدمة',
-                    style: TextStyle(color: AppConstants.textLight),
+                    style: TextStyle(color: AppConstants.textDark),
                   ),
                   subtitle: Text(
                     StorageService.instance.formatStorageUsed(_usedStorageMb),
                     style: const TextStyle(color: AppConstants.textMuted),
                   ),
                 ),
-                const Divider(color: AppConstants.bgDark),
-                // Max storage slider
+                const Divider(color: AppConstants.dividerColor),
                 ListTile(
                   leading: const Icon(
                     Icons.sd_storage_rounded,
@@ -78,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   title: const Text(
                     'الحد الأقصى للتخزين',
-                    style: TextStyle(color: AppConstants.textLight),
+                    style: TextStyle(color: AppConstants.textDark),
                   ),
                   subtitle: Text(
                     '${_maxStorageGb.toStringAsFixed(0)} ج.ب',
@@ -89,9 +87,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: AppConstants.primaryLight,
-                      inactiveTrackColor:
-                          AppConstants.textMuted.withValues(alpha: 0.2),
+                      activeTrackColor: AppConstants.primaryColor,
+                      inactiveTrackColor: AppConstants.dividerColor,
                       thumbColor: AppConstants.secondaryColor,
                       trackHeight: 4,
                     ),
@@ -108,16 +105,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-                const Divider(color: AppConstants.bgDark),
-                // Delete all
+                const Divider(color: AppConstants.dividerColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.delete_forever_rounded,
-                    color: Colors.redAccent,
+                    color: Colors.red.shade600,
                   ),
-                  title: const Text(
+                  title: Text(
                     'حذف جميع التنزيلات',
-                    style: TextStyle(color: Colors.redAccent),
+                    style: TextStyle(color: Colors.red.shade600),
                   ),
                   onTap: _confirmDeleteAll,
                 ),
@@ -140,18 +136,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       RadioListTile<String>(
                         value: 'ar',
-                        activeColor: AppConstants.primaryLight,
+                        activeColor: AppConstants.primaryColor,
                         title: const Text(
                           'العربية',
-                          style: TextStyle(color: AppConstants.textLight),
+                          style: TextStyle(color: AppConstants.textDark),
                         ),
                       ),
                       RadioListTile<String>(
                         value: 'en',
-                        activeColor: AppConstants.primaryLight,
+                        activeColor: AppConstants.primaryColor,
                         title: const Text(
                           'English',
-                          style: TextStyle(color: AppConstants.textLight),
+                          style: TextStyle(color: AppConstants.textDark),
                         ),
                       ),
                     ],
@@ -170,33 +166,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const ListTile(
                   leading: Icon(
                     Icons.school_rounded,
-                    color: AppConstants.primaryLight,
+                    color: AppConstants.primaryColor,
                   ),
                   title: Text(
                     AppConstants.appShortName,
                     style: TextStyle(
-                      color: AppConstants.textLight,
+                      color: AppConstants.textDark,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   subtitle: Text(
-                    'منظم المقررات والتنزيلات • الإصدار 1.0.0',
+                    'منظم المقررات والتنزيلات • الإصدار 1.0.4',
                     style: TextStyle(color: AppConstants.textMuted),
                   ),
                 ),
-                const Divider(color: AppConstants.bgDark),
+                const Divider(color: AppConstants.dividerColor),
                 const Padding(
                   padding: EdgeInsets.all(16),
                   child: Text(
                     AppConstants.appShortDescription,
                     style: TextStyle(
-                      color: AppConstants.textLight,
+                      color: AppConstants.textDark,
                       fontSize: 13,
                       height: 1.4,
                     ),
                   ),
                 ),
-                const Divider(color: AppConstants.bgDark),
+                const Divider(color: AppConstants.dividerColor),
                 const ListTile(
                   leading: Icon(
                     Icons.verified_user_outlined,
@@ -205,7 +201,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(
                     'إخلاء مسؤولية (Disclaimer)',
                     style: TextStyle(
-                      color: AppConstants.textLight,
+                      color: AppConstants.textDark,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -222,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-                const Divider(color: AppConstants.bgDark),
+                const Divider(color: AppConstants.dividerColor),
                 ListTile(
                   leading: const Icon(
                     Icons.privacy_tip_outlined,
@@ -230,16 +226,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   title: const Text(
                     'سياسة الخصوصية',
-                    style: TextStyle(color: AppConstants.textLight),
+                    style: TextStyle(color: AppConstants.textDark),
                   ),
                   trailing: const Icon(
                     Icons.open_in_new_rounded,
                     color: AppConstants.textMuted,
                     size: 18,
                   ),
-                  onTap: () {
-                    // Will open in WebView or external browser
-                  },
+                  onTap: () {},
                 ),
               ],
             ),
@@ -252,12 +246,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: AppConstants.primaryLight, size: 20),
+        Icon(icon, color: AppConstants.primaryColor, size: 20),
         const SizedBox(width: 8),
         Text(
           title,
           style: const TextStyle(
-            color: AppConstants.textLight,
+            color: AppConstants.textDark,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -269,11 +263,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildCard({required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
-        color: AppConstants.cardDark,
+        color: AppConstants.cardLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppConstants.textMuted.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: AppConstants.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: AppConstants.primaryColor.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(children: children),
     );
@@ -290,20 +289,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          backgroundColor: AppConstants.cardDark,
+          backgroundColor: AppConstants.cardLight,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           title: const Text(
             'حذف جميع التنزيلات',
             style: TextStyle(
-              color: AppConstants.textLight,
+              color: AppConstants.textDark,
               fontWeight: FontWeight.bold,
             ),
           ),
           content: const Text(
             'سيتم حذف جميع الملفات المحملة نهائياً ولا يمكن التراجع. متأكد؟',
-            style: TextStyle(color: AppConstants.textLight),
+            style: TextStyle(color: AppConstants.textDark),
           ),
           actions: [
             TextButton(
@@ -322,7 +321,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('تم حذف جميع التنزيلات'),
-                      backgroundColor: AppConstants.primaryColor,
+                      backgroundColor: AppConstants.primaryDark,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -332,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: Colors.red.shade600,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
