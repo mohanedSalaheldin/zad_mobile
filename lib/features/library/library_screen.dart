@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:zad_mobile/app/constants.dart';
@@ -8,6 +9,7 @@ import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/downloads/download_model.dart';
 import 'package:zad_mobile/features/library/video_player_screen.dart';
 import 'package:zad_mobile/features/library/audio_player_screen.dart';
+import 'package:zad_mobile/features/library/pdf_helper.dart';
 
 class LibraryScreen extends StatefulWidget {
   final DownloadItem? initialFile;
@@ -54,6 +56,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
               backgroundColor: AppConstants.cardDark,
               foregroundColor: AppConstants.textLight,
               elevation: 0,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              ),
               title: const Text(
                 'المكتبة المحلية',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -209,6 +216,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ),
         ),
         onTap: () => _openFile(item),
+        onLongPress: item.category == FileCategory.pdf
+            ? () => PdfHelper.openPdf(context, filePath: item.localPath, title: item.title, forceAsk: true)
+            : null,
         trailing: IconButton(
           icon: const Icon(
             Icons.delete_outline_rounded,
@@ -330,6 +340,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
         );
         break;
       case FileCategory.pdf:
+        await PdfHelper.openPdf(
+          context,
+          filePath: item.localPath,
+          title: item.title,
+        );
+        break;
       case FileCategory.document:
       case FileCategory.other:
         final file = File(item.localPath);

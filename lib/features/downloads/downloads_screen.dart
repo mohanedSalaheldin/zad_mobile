@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:zad_mobile/app/constants.dart';
@@ -9,7 +10,7 @@ import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
 import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/library/audio_player_screen.dart';
 import 'package:zad_mobile/features/library/video_player_screen.dart';
-import 'package:zad_mobile/features/library/pdf_reader_screen.dart';
+import 'package:zad_mobile/features/library/pdf_helper.dart';
 
 /// Full-page Downloads screen used as a Navigation tab.
 class DownloadsPage extends StatefulWidget {
@@ -46,6 +47,11 @@ class _DownloadsPageState extends State<DownloadsPage>
               foregroundColor: Colors.white,
               elevation: 0,
               automaticallyImplyLeading: false,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              ),
               title: const Row(
                 children: [
                   Icon(Icons.download_rounded, color: Colors.white, size: 22),
@@ -409,6 +415,9 @@ class _DownloadsPageState extends State<DownloadsPage>
           ),
           trailing: _getStatusIcon(item),
           onTap: () => _openFile(item),
+          onLongPress: item.category == FileCategory.pdf && item.status == DownloadStatus.complete
+              ? () => PdfHelper.openPdf(context, filePath: item.localPath, title: item.title, forceAsk: true)
+              : null,
         ),
       ),
     );
@@ -540,14 +549,10 @@ class _DownloadsPageState extends State<DownloadsPage>
         break;
 
       case FileCategory.pdf:
-        Navigator.push(
+        await PdfHelper.openPdf(
           context,
-          MaterialPageRoute(
-            builder: (_) => PdfReaderScreen(
-              filePath: item.localPath,
-              title: item.title,
-            ),
-          ),
+          filePath: item.localPath,
+          title: item.title,
         );
         break;
 

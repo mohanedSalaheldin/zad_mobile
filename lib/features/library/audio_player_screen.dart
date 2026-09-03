@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/features/library/cubit/audio_player_cubit.dart';
@@ -90,6 +91,11 @@ class _AudioPlayerViewState extends State<_AudioPlayerView>
               backgroundColor: AppConstants.primaryColor,
               foregroundColor: Colors.white,
               elevation: 0,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              ),
               title: Text(
                 widget.title,
                 style: const TextStyle(fontSize: 14, color: Colors.white),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/widgets/loading_indicator.dart';
@@ -7,7 +8,14 @@ import 'package:zad_mobile/features/downloads/download_manager.dart';
 import 'package:zad_mobile/features/webview/js_bridge.dart';
 
 class WebViewScreen extends StatefulWidget {
-  const WebViewScreen({super.key});
+  final ValueChanged<bool>? onLoginStateChanged;
+  final VoidCallback? onOpenDownloads;
+
+  const WebViewScreen({
+    super.key,
+    this.onLoginStateChanged,
+    this.onOpenDownloads,
+  });
 
   @override
   State<WebViewScreen> createState() => WebViewScreenState();
@@ -21,6 +29,20 @@ class WebViewScreenState extends State<WebViewScreen>
   String _currentSemester = 'عام';
   String _currentCourse = 'المقرر_العام';
   String _currentWeek = 'ملفات';
+  bool _isLoginPage = false;
+
+  bool _checkIsLoginUrl(WebUri? url) {
+    if (url == null) return false;
+    return url.toString().toLowerCase().contains('login');
+  }
+
+  void _updateLoginState(WebUri? url) {
+    final isLogin = _checkIsLoginUrl(url);
+    if (_isLoginPage != isLogin) {
+      setState(() => _isLoginPage = isLogin);
+      widget.onLoginStateChanged?.call(isLogin);
+    }
+  }
 
   /// Reloads the initial login/home URL
   void loadHomeUrl() {
@@ -31,6 +53,18 @@ class WebViewScreenState extends State<WebViewScreen>
     );
   }
 
+  Future<bool> canGoBack() async {
+    return (_webViewController != null && await _webViewController!.canGoBack());
+  }
+
+  Future<void> goBack() async {
+    await _webViewController?.goBack();
+  }
+
+  void showExitDialog() {
+    _showExitDialog();
+  }
+
   // Keep page alive when switching tabs
   @override
   bool get wantKeepAlive => true;
@@ -38,18 +72,7 @@ class WebViewScreenState extends State<WebViewScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (_webViewController != null &&
-            await _webViewController!.canGoBack()) {
-          await _webViewController!.goBack();
-        } else {
-          _showExitDialog();
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: AppConstants.bgLight,
         body: SafeArea(
           child: Stack(
@@ -88,10 +111,18 @@ class WebViewScreenState extends State<WebViewScreen>
                   );
                 },
                 onLoadStart: (controller, url) {
+                  final isLogin = _checkIsLoginUrl(url);
+                  if (_isLoginPage != isLogin) {
+                    setState(() => _isLoginPage = isLogin);
+                    widget.onLoginStateChanged?.call(isLogin);
+                  }
                   setState(() {
                     _isLoading = true;
                     _progress = 0;
                   });
+                },
+                onUpdateVisitedHistory: (controller, url, isReload) {
+                  _updateLoginState(url);
                 },
                 onLoadStop: (controller, url) async {
                   setState(() {
@@ -102,6 +133,7 @@ class WebViewScreenState extends State<WebViewScreen>
                     source: JsBridge.contextExtractionScript,
                   );
                   await _updateCourseContext();
+                  _updateLoginState(url);
                 },
                 onProgressChanged: (controller, progress) {
                   setState(() {
@@ -189,15 +221,69 @@ class WebViewScreenState extends State<WebViewScreen>
                 isLoading: _isLoading,
                 progress: _progress,
               ),
+
+              // Quick access button to offline downloads on login screen
+              if (_isLoginPage)
+                Positioned(
+                  top: 14,
+                  left: 14,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _switchToDownloadsTab(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryColor,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppConstants.primaryColor
+                                  .withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.download_for_offline_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'التنزيلات (أوفلاين)',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// Switches the parent MainNavigationScreen to Downloads tab (index 1)
   void _switchToDownloadsTab(BuildContext context) {
+    if (widget.onOpenDownloads != null) {
+      widget.onOpenDownloads!();
+      return;
+    }
     // Walk up to find the BottomNavigationBar scaffold and switch tab
     final scaffold = context.findAncestorStateOfType<
         // ignore: invalid_use_of_protected_member
@@ -265,7 +351,7 @@ class WebViewScreenState extends State<WebViewScreen>
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.of(context).maybePop();
+                SystemNavigator.pop();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryColor,

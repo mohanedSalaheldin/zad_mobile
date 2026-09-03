@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:zad_mobile/app/constants.dart';
@@ -37,6 +38,11 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           backgroundColor: AppConstants.primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           title: Text(
             widget.title,
             style: const TextStyle(fontSize: 14, color: Colors.white),

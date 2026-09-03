@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/features/downloads/cubit/downloads_cubit.dart';
@@ -15,11 +16,20 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  bool _isLoginPage = false;
   final GlobalKey<WebViewScreenState> _webViewKey =
       GlobalKey<WebViewScreenState>();
 
   late final List<Widget> _pages = [
-    WebViewScreen(key: _webViewKey),
+    WebViewScreen(
+      key: _webViewKey,
+      onLoginStateChanged: (isLogin) {
+        if (_isLoginPage != isLogin) {
+          setState(() => _isLoginPage = isLogin);
+        }
+      },
+      onOpenDownloads: switchToDownloads,
+    ),
     const DownloadsPage(),
   ];
 
@@ -38,12 +48,51 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+    final overlayStyle = _currentIndex == 0
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark, // Dark icons for light Home background
+            statusBarBrightness: Brightness.light, // iOS
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light, // White icons for brown Downloads AppBar
+            statusBarBrightness: Brightness.dark, // iOS
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          );
+
+    final showNavBar = !(_isLoginPage && _currentIndex == 0);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          if (_currentIndex != 0) {
+            // If on Downloads tab, switch back to Home tab
+            setState(() => _currentIndex = 0);
+            return;
+          }
+          // If on Home tab, check webview history or show exit dialog
+          final webState = _webViewKey.currentState;
+          if (webState != null && await webState.canGoBack()) {
+            await webState.goBack();
+          } else {
+            webState?.showExitDialog();
+          }
+        },
+        child: Scaffold(
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          bottomNavigationBar: showNavBar ? _buildNavBar() : null,
+        ),
       ),
-      bottomNavigationBar: _buildNavBar(),
     );
   }
 

@@ -195,6 +195,15 @@ class StorageService {
     await _settingsBox.put('language', lang);
   }
 
+  /// PDF Viewer preference: 'system' (default), 'internal', 'ask'
+  String getPdfViewerPreference() {
+    return _settingsBox.get('pdfViewerPreference', defaultValue: 'system') as String;
+  }
+
+  Future<void> setPdfViewerPreference(String pref) async {
+    await _settingsBox.put('pdfViewerPreference', pref);
+  }
+
   DownloadItem? findByTaskId(String taskId) {
     try {
       return getAllDownloads().firstWhere((d) => d.taskId == taskId);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/services/storage_service.dart';
 
@@ -13,6 +14,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _maxStorageGb = AppConstants.defaultMaxStorageGb;
   double _usedStorageMb = 0;
   String _language = 'ar';
+  String _pdfViewerPref = 'system';
 
   @override
   void initState() {
@@ -26,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _maxStorageGb = storage.getMaxStorageGb();
       _language = storage.getLanguage();
+      _pdfViewerPref = storage.getPdfViewerPreference();
       _usedStorageMb = used;
     });
   }
@@ -40,6 +43,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           backgroundColor: AppConstants.primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           title: const Text(
             'الإعدادات',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
@@ -158,6 +166,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
 
+            // ─── PDF Viewer Section ───
+            _buildSectionHeader('مشغل ملفات PDF', Icons.picture_as_pdf_rounded),
+            const SizedBox(height: 8),
+            _buildCard(
+              children: [
+                RadioGroup<String>(
+                  groupValue: _pdfViewerPref,
+                  onChanged: (val) {
+                    if (val != null) _setPdfViewerPref(val);
+                  },
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        value: 'system',
+                        activeColor: AppConstants.primaryColor,
+                        title: const Text(
+                          'مشغل النظام الافتراضي (مستحسن)',
+                          style: TextStyle(
+                            color: AppConstants.textDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'فتح الملفات باستخدام قارئ PDF الافتراضي في جهازك (مثل Google Drive أو Adobe)',
+                          style: TextStyle(
+                            color: AppConstants.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const Divider(color: AppConstants.dividerColor),
+                      RadioListTile<String>(
+                        value: 'ask',
+                        activeColor: AppConstants.primaryColor,
+                        title: const Text(
+                          'السؤال في كل مرة',
+                          style: TextStyle(
+                            color: AppConstants.textDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'سؤالك عن المشغل المفضل في كل مرة تنقر فيها على ملف PDF',
+                          style: TextStyle(
+                            color: AppConstants.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const Divider(color: AppConstants.dividerColor),
+                      RadioListTile<String>(
+                        value: 'internal',
+                        activeColor: AppConstants.primaryColor,
+                        title: const Text(
+                          'المشغل المدمج في التطبيق',
+                          style: TextStyle(
+                            color: AppConstants.textDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'عرض ملفات PDF مباشرة داخل شاشة القارئ في تطبيق زاد',
+                          style: TextStyle(
+                            color: AppConstants.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
             // ─── About Section ───
             _buildSectionHeader('عن التطبيق', Icons.info_outline_rounded),
             const SizedBox(height: 8),
@@ -176,7 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   subtitle: Text(
-                    'منظم المقررات والتنزيلات • الإصدار 1.0.4',
+                    'منظم المقررات والتنزيلات • الإصدار 1.0.6',
                     style: TextStyle(color: AppConstants.textMuted),
                   ),
                 ),
@@ -281,6 +365,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setLanguage(String lang) async {
     setState(() => _language = lang);
     await StorageService.instance.setLanguage(lang);
+  }
+
+  Future<void> _setPdfViewerPref(String pref) async {
+    setState(() => _pdfViewerPref = pref);
+    await StorageService.instance.setPdfViewerPreference(pref);
   }
 
   void _confirmDeleteAll() {

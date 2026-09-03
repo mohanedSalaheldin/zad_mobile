@@ -71,6 +71,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             backgroundColor: Colors.black.withValues(alpha: 0.7),
             foregroundColor: Colors.white,
             elevation: 0,
+            systemOverlayStyle: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            ),
             title: Text(
               widget.title,
               style: const TextStyle(fontSize: 14),
