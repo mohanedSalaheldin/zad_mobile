@@ -89,6 +89,10 @@ class WebViewScreenState extends State<WebViewScreen>
                   databaseEnabled: true,
                   cacheEnabled: true,
                   useShouldOverrideUrlLoading: true,
+                  useOnNavigationResponse: true,
+                  sharedCookiesEnabled: true,
+                  thirdPartyCookiesEnabled: true,
+                  allowsLinkPreview: false,
                   mediaPlaybackRequiresUserGesture: false,
                   allowsInlineMediaPlayback: true,
                   userAgent: Platform.isIOS ? null : AppConstants.customUserAgent,
@@ -212,6 +216,12 @@ class WebViewScreenState extends State<WebViewScreen>
 
                   return NavigationActionPolicy.ALLOW;
                 },
+                onNavigationResponse: (controller, navigationResponse) async {
+                  if (Platform.isIOS) {
+                    await _syncCookiesOnIos(navigationResponse);
+                  }
+                  return NavigationResponseAction.ALLOW;
+                },
                 onReceivedError: (controller, request, error) {
                   debugPrint('ZadBridge: WebView error: ${error.description}');
                 },
@@ -277,6 +287,87 @@ class WebViewScreenState extends State<WebViewScreen>
           ),
         ),
       );
+  }
+
+  /// Extracts and synchronizes Set-Cookie headers on iOS during redirects
+  /// to prevent WKWebView from dropping session cookies between lms-ar121 and zad-academy.com.
+  /// (Strictly guarded by Platform.isIOS to guarantee zero side effects on Android).
+  Future<void> _syncCookiesOnIos(NavigationResponse navigationResponse) async {
+    try {
+      final response = navigationResponse.response;
+      if (response == null || response.headers == null) return;
+
+      // Case-insensitive check for Set-Cookie header
+      String? rawSetCookie;
+      for (final entry in response.headers!.entries) {
+        if (entry.key.toLowerCase() == 'set-cookie') {
+          rawSetCookie = entry.value;
+          break;
+        }
+      }
+
+      if (rawSetCookie == null || rawSetCookie.trim().isEmpty) return;
+
+      final cookieManager = CookieManager.instance();
+      // Split multiple cookies if formatted as comma/newline separated list
+      final cookieDirectives = rawSetCookie.split(RegExp(r'\r?\n|, (?=[A-Za-z0-9_\-]+=[^;])'));
+
+      for (final directive in cookieDirectives) {
+        final parts = directive.split(';').map((s) => s.trim()).toList();
+        if (parts.isEmpty || !parts[0].contains('=')) continue;
+
+        final firstEq = parts[0].indexOf('=');
+        final name = parts[0].substring(0, firstEq).trim();
+        final value = parts[0].substring(firstEq + 1).trim();
+        if (name.isEmpty) continue;
+
+        String? domain;
+        String? path;
+        bool isSecure = true;
+        bool isHttpOnly = false;
+
+        for (int i = 1; i < parts.length; i++) {
+          final partLower = parts[i].toLowerCase();
+          if (partLower.startsWith('domain=')) {
+            domain = parts[i].substring(7).trim();
+          } else if (partLower.startsWith('path=')) {
+            path = parts[i].substring(5).trim();
+          } else if (partLower == 'secure') {
+            isSecure = true;
+          } else if (partLower == 'httponly') {
+            isHttpOnly = true;
+          }
+        }
+
+        // Standardize domain to cover all subdomains of zad-academy.com
+        final effectiveDomain = (domain != null && domain.contains('zad-academy.com'))
+            ? '.zad-academy.com'
+            : (domain ?? '.zad-academy.com');
+
+        // Explicitly set cookie for both main portal and LMS subdomain
+        await cookieManager.setCookie(
+          url: WebUri('https://zad-academy.com'),
+          name: name,
+          value: value,
+          domain: effectiveDomain,
+          path: path ?? '/',
+          isSecure: isSecure,
+          isHttpOnly: isHttpOnly,
+        );
+
+        await cookieManager.setCookie(
+          url: WebUri(AppConstants.baseUrl),
+          name: name,
+          value: value,
+          domain: effectiveDomain,
+          path: path ?? '/',
+          isSecure: isSecure,
+          isHttpOnly: isHttpOnly,
+        );
+      }
+    } catch (e) {
+      debugPrint('ZadBridge: iOS Cookie sync note: $e');
+    }
   }
 
   /// Switches the parent MainNavigationScreen to Downloads tab (index 1)
