@@ -11,6 +11,7 @@ import 'package:zad_mobile/features/downloads/cubit/downloads_state.dart';
 import 'package:zad_mobile/features/library/audio_player_screen.dart';
 import 'package:zad_mobile/features/library/video_player_screen.dart';
 import 'package:zad_mobile/features/library/pdf_helper.dart';
+import 'package:zad_mobile/features/settings/settings_screen.dart';
 
 /// Full-page Downloads screen used as a Navigation tab.
 class DownloadsPage extends StatefulWidget {
@@ -66,6 +67,24 @@ class _DownloadsPageState extends State<DownloadsPage>
                   ),
                 ],
               ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                  tooltip: 'الإعدادات',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SettingsScreen(),
+                      ),
+                    ).then((_) {
+                      if (context.mounted) {
+                        context.read<DownloadsCubit>().loadDownloads();
+                      }
+                    });
+                  },
+                ),
+              ],
             ),
             body: Column(
               children: [

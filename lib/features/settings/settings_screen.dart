@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/services/storage_service.dart';
+import 'package:zad_mobile/features/settings/legal_viewer_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -55,7 +56,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           centerTitle: true,
         ),
         body: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.paddingOf(context).bottom + 48,
+          ),
           children: [
             // ─── Storage Section ───
             _buildSectionHeader('التخزين', Icons.storage_rounded),
@@ -305,6 +311,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(color: AppConstants.dividerColor),
                 ListTile(
                   leading: const Icon(
+                    Icons.gavel_rounded,
+                    color: AppConstants.primaryColor,
+                  ),
+                  title: const Text(
+                    'شروط وأحكام الاستخدام',
+                    style: TextStyle(color: AppConstants.textDark),
+                  ),
+                  subtitle: const Text(
+                    'حقوق الملكية والاستخدام العادل والمسؤولية',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppConstants.textMuted,
+                    size: 22,
+                  ),
+                  onTap: () {
+                    LegalViewerSheet.show(context, initialTabIndex: 0);
+                  },
+                ),
+                const Divider(color: AppConstants.dividerColor),
+                ListTile(
+                  leading: const Icon(
                     Icons.privacy_tip_outlined,
                     color: AppConstants.accentColor,
                   ),
@@ -312,12 +341,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'سياسة الخصوصية',
                     style: TextStyle(color: AppConstants.textDark),
                   ),
-                  trailing: const Icon(
-                    Icons.open_in_new_rounded,
-                    color: AppConstants.textMuted,
-                    size: 18,
+                  subtitle: const Text(
+                    'حماية البيانات والتخزين المحلي والأذونات',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
                   ),
-                  onTap: () {},
+                  trailing: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppConstants.textMuted,
+                    size: 22,
+                  ),
+                  onTap: () {
+                    LegalViewerSheet.show(context, initialTabIndex: 1);
+                  },
                 ),
               ],
             ),

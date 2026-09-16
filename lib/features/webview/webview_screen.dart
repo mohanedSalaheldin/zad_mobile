@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -90,7 +91,7 @@ class WebViewScreenState extends State<WebViewScreen>
                   useShouldOverrideUrlLoading: true,
                   mediaPlaybackRequiresUserGesture: false,
                   allowsInlineMediaPlayback: true,
-                  userAgent: AppConstants.customUserAgent,
+                  userAgent: Platform.isIOS ? null : AppConstants.customUserAgent,
                   supportZoom: true,
                   transparentBackground: false,
                   mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
