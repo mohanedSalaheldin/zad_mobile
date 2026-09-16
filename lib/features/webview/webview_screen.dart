@@ -31,6 +31,7 @@ class WebViewScreenState extends State<WebViewScreen>
   String _currentCourse = 'المقرر_العام';
   String _currentWeek = 'ملفات';
   bool _isLoginPage = false;
+  String? _savedMoodleSession;
 
   bool _checkIsLoginUrl(WebUri? url) {
     if (url == null) return false;
@@ -114,6 +115,15 @@ class WebViewScreenState extends State<WebViewScreen>
                       debugPrint('ZadBridge: JS bridge ready');
                     },
                   );
+                  controller.addJavaScriptHandler(
+                    handlerName: 'onLmsLoginSubmit',
+                    callback: (args) {
+                      debugPrint('ZadBridge: [JS] LMS Login Submit detected: $args');
+                    },
+                  );
+                },
+                onConsoleMessage: (controller, consoleMessage) {
+                  debugPrint('ZadBridge [JS Console]: ${consoleMessage.messageLevel} | ${consoleMessage.message}');
                 },
                 onLoadStart: (controller, url) {
                   final isLogin = _checkIsLoginUrl(url);
@@ -134,6 +144,36 @@ class WebViewScreenState extends State<WebViewScreen>
                     _isLoading = false;
                     _progress = 1.0;
                   });
+
+                  if (Platform.isIOS) {
+                    // Hook form submissions to track authentication POST
+                    await controller.evaluateJavascript(source: '''
+                      (function() {
+                        if (window._zadHooked) return;
+                        window._zadHooked = true;
+                        const origSubmit = HTMLFormElement.prototype.submit;
+                        HTMLFormElement.prototype.submit = function() {
+                          try {
+                            console.log('ZadBridge: Form submit called for: ' + (this.action || 'empty'));
+                            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                              window.flutter_inappwebview.callHandler('onLmsLoginSubmit', { action: this.action });
+                            }
+                          } catch(e) {}
+                          return origSubmit.apply(this, arguments);
+                        };
+                      })();
+                    ''');
+
+                    // Debug active cookies in WKHTTPCookieStore
+                    try {
+                      final cookies = await CookieManager.instance().getCookies(
+                        url: url ?? WebUri(AppConstants.baseUrl),
+                      );
+                      final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
+                      debugPrint('ZadBridge [iOS Cookies @ ${url?.host}]: $cookieStr');
+                    } catch (_) {}
+                  }
+
                   await controller.evaluateJavascript(
                     source: JsBridge.contextExtractionScript,
                   );
@@ -218,7 +258,10 @@ class WebViewScreenState extends State<WebViewScreen>
                 },
                 onNavigationResponse: (controller, navigationResponse) async {
                   if (Platform.isIOS) {
-                    await _syncCookiesOnIos(navigationResponse);
+                    final action = await _handleIosNavigationResponse(controller, navigationResponse);
+                    if (action != null) {
+                      return action;
+                    }
                   }
                   return NavigationResponseAction.ALLOW;
                 },
@@ -289,27 +332,114 @@ class WebViewScreenState extends State<WebViewScreen>
       );
   }
 
-  /// Extracts and synchronizes Set-Cookie headers on iOS during redirects
-  /// to prevent WKWebView from dropping session cookies between lms-ar121 and zad-academy.com.
+  /// Intercepts navigation responses on iOS to solve the notorious WebKit 302/303 redirect
+  /// cookie-drop bug during SSO authentication between zad-academy.com and lms-ar121.
   /// (Strictly guarded by Platform.isIOS to guarantee zero side effects on Android).
-  Future<void> _syncCookiesOnIos(NavigationResponse navigationResponse) async {
+  Future<NavigationResponseAction?> _handleIosNavigationResponse(
+    InAppWebViewController controller,
+    NavigationResponse navigationResponse,
+  ) async {
     try {
       final response = navigationResponse.response;
-      if (response == null || response.headers == null) return;
+      if (response == null) return null;
 
-      // Case-insensitive check for Set-Cookie header
+      final statusCode = response.statusCode ?? 0;
+      final urlStr = response.url?.toString() ?? '';
+      final headers = response.headers ?? {};
+
+      debugPrint('ZadBridge [iOS NavResponse]: status $statusCode from $urlStr');
+
+      // 1. Extract Set-Cookie header (case-insensitive)
       String? rawSetCookie;
-      for (final entry in response.headers!.entries) {
+      for (final entry in headers.entries) {
         if (entry.key.toLowerCase() == 'set-cookie') {
           rawSetCookie = entry.value;
           break;
         }
       }
 
-      if (rawSetCookie == null || rawSetCookie.trim().isEmpty) return;
+      // 2. Extract Location header (case-insensitive)
+      String? locationHeader;
+      for (final entry in headers.entries) {
+        if (entry.key.toLowerCase() == 'location') {
+          locationHeader = entry.value;
+          break;
+        }
+      }
 
+      if (rawSetCookie != null && rawSetCookie.isNotEmpty) {
+        debugPrint('ZadBridge [iOS Set-Cookie]: $rawSetCookie');
+        await _syncRawCookies(rawSetCookie);
+      }
+
+      // 3. Handle 301/302/303/307 Redirects
+      if (statusCode >= 300 && statusCode < 400 && locationHeader != null && locationHeader.isNotEmpty) {
+        debugPrint('ZadBridge [iOS Redirect]: $statusCode -> $locationHeader');
+
+        // Resolve target URL
+        Uri resolvedUri;
+        try {
+          resolvedUri = Uri.parse(locationHeader);
+          if (!resolvedUri.hasScheme) {
+            final base = response.url ?? WebUri(AppConstants.baseUrl);
+            resolvedUri = base.uriValue.resolve(locationHeader);
+          }
+        } catch (_) {
+          resolvedUri = Uri.parse(AppConstants.baseUrl);
+        }
+
+        final targetUrl = resolvedUri.toString();
+        final isGoingToLogin = targetUrl.contains('/login') || targetUrl.contains('login.html');
+
+        // If redirect is taking user to the main LMS dashboard/home (NOT to a login page)
+        if (!isGoingToLogin) {
+          // Check for MoodleSession from header or CookieManager
+          String? sessionVal;
+          if (rawSetCookie != null && rawSetCookie.contains('MoodleSession')) {
+            final match = RegExp(r'MoodleSession=([^;]+)').firstMatch(rawSetCookie);
+            sessionVal = match?.group(1);
+          }
+
+          if (sessionVal == null || sessionVal.isEmpty) {
+            final cookies = await CookieManager.instance().getCookies(
+              url: WebUri(AppConstants.baseUrl),
+            );
+            final mCookie = cookies.where((c) => c.name == 'MoodleSession').firstOrNull;
+            sessionVal = mCookie?.value ?? _savedMoodleSession;
+          }
+
+          if (sessionVal != null && sessionVal.isNotEmpty) {
+            _savedMoodleSession = sessionVal;
+            debugPrint('ZadBridge [iOS Session Found]: $sessionVal -> Loading target: $targetUrl');
+
+            // Cancel the buggy WebKit redirect which drops cookies during 302/303
+            // and reload manually with explicit Cookie header
+            Future.microtask(() async {
+              await Future.delayed(const Duration(milliseconds: 80));
+              await controller.loadUrl(
+                urlRequest: URLRequest(
+                  url: WebUri(targetUrl),
+                  headers: {
+                    'Cookie': 'MoodleSession=$sessionVal',
+                  },
+                ),
+              );
+            });
+
+            return NavigationResponseAction.CANCEL;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('ZadBridge [iOS NavResponse Note]: $e');
+    }
+    return null;
+  }
+
+  /// Synchronizes raw Set-Cookie strings across all necessary domains and stores with persistence.
+  Future<void> _syncRawCookies(String rawSetCookie) async {
+    try {
       final cookieManager = CookieManager.instance();
-      // Split multiple cookies if formatted as comma/newline separated list
       final cookieDirectives = rawSetCookie.split(RegExp(r'\r?\n|, (?=[A-Za-z0-9_\-]+=[^;])'));
 
       for (final directive in cookieDirectives) {
@@ -321,16 +451,17 @@ class WebViewScreenState extends State<WebViewScreen>
         final value = parts[0].substring(firstEq + 1).trim();
         if (name.isEmpty) continue;
 
-        String? domain;
+        if (name == 'MoodleSession') {
+          _savedMoodleSession = value;
+        }
+
         String? path;
-        bool isSecure = true;
+        bool isSecure = false;
         bool isHttpOnly = false;
 
         for (int i = 1; i < parts.length; i++) {
           final partLower = parts[i].toLowerCase();
-          if (partLower.startsWith('domain=')) {
-            domain = parts[i].substring(7).trim();
-          } else if (partLower.startsWith('path=')) {
+          if (partLower.startsWith('path=')) {
             path = parts[i].substring(5).trim();
           } else if (partLower == 'secure') {
             isSecure = true;
@@ -339,34 +470,46 @@ class WebViewScreenState extends State<WebViewScreen>
           }
         }
 
-        // Standardize domain to cover all subdomains of zad-academy.com
-        final effectiveDomain = (domain != null && domain.contains('zad-academy.com'))
-            ? '.zad-academy.com'
-            : (domain ?? '.zad-academy.com');
+        final expireTime = DateTime.now().add(const Duration(days: 30)).millisecondsSinceEpoch;
 
-        // Explicitly set cookie for both main portal and LMS subdomain
-        await cookieManager.setCookie(
-          url: WebUri('https://zad-academy.com'),
-          name: name,
-          value: value,
-          domain: effectiveDomain,
-          path: path ?? '/',
-          isSecure: isSecure,
-          isHttpOnly: isHttpOnly,
-        );
-
+        // 1. Host-only for lms-ar121.zad-academy.com
         await cookieManager.setCookie(
           url: WebUri(AppConstants.baseUrl),
           name: name,
           value: value,
-          domain: effectiveDomain,
+          domain: 'lms-ar121.zad-academy.com',
           path: path ?? '/',
           isSecure: isSecure,
           isHttpOnly: isHttpOnly,
+          expiresDate: expireTime,
+        );
+
+        // 2. Wildcard for .zad-academy.com (all subdomains)
+        await cookieManager.setCookie(
+          url: WebUri(AppConstants.baseUrl),
+          name: name,
+          value: value,
+          domain: '.zad-academy.com',
+          path: path ?? '/',
+          isSecure: isSecure,
+          isHttpOnly: isHttpOnly,
+          expiresDate: expireTime,
+        );
+
+        // 3. Main portal zad-academy.com
+        await cookieManager.setCookie(
+          url: WebUri('https://zad-academy.com'),
+          name: name,
+          value: value,
+          domain: '.zad-academy.com',
+          path: path ?? '/',
+          isSecure: isSecure,
+          isHttpOnly: isHttpOnly,
+          expiresDate: expireTime,
         );
       }
     } catch (e) {
-      debugPrint('ZadBridge: iOS Cookie sync note: $e');
+      debugPrint('ZadBridge: Cookie sync error: $e');
     }
   }
 
