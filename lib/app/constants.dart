@@ -4,6 +4,8 @@ class AppConstants {
   // App Identity
   static const String appTitle = 'رفيق زاد | منظم المقررات والتنزيلات';
   static const String appShortName = 'رفيق زاد';
+  static const String appVersion = '1.0.7';
+  static const int appBuildNumber = 7;
   static const String appShortDescription =
       'أداة مساعدة غير رسمية لطلاب أكاديمية زاد لتنظيم المقررات وتنزيل الدروس أوفلاين.';
 

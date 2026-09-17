@@ -134,7 +134,7 @@ class _LegalViewerSheetState extends State<LegalViewerSheet>
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'تطبيق رفيق زاد • الإصدار 1.0.6',
+                          'تطبيق رفيق زاد • الإصدار ${AppConstants.appVersion}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppConstants.textMuted,

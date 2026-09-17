@@ -266,7 +266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   subtitle: Text(
-                    'منظم المقررات والتنزيلات • الإصدار 1.0.6',
+                    'منظم المقررات والتنزيلات • الإصدار ${AppConstants.appVersion}',
                     style: TextStyle(color: AppConstants.textMuted),
                   ),
                 ),
