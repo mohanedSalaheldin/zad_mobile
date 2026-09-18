@@ -38,10 +38,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _onTabTapped(int index) {
-    if (index == 0) {
-      // Whenever Home is clicked (whether switching to it or already on it),
-      // reload the initial Home URL
-      _webViewKey.currentState?.loadHomeUrl();
+    if (index == _currentIndex) {
+      // If already on Home tab and user taps Home again, return to LMS dashboard
+      if (index == 0) {
+        _webViewKey.currentState?.loadHomeUrl();
+      }
+      return;
     }
     setState(() => _currentIndex = index);
   }

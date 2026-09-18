@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:zad_mobile/app/constants.dart';
+import 'package:zad_mobile/shared/services/storage_service.dart';
 import 'package:zad_mobile/shared/widgets/loading_indicator.dart';
 import 'package:zad_mobile/features/downloads/download_manager.dart';
 import 'package:zad_mobile/features/webview/js_bridge.dart';
@@ -32,6 +34,24 @@ class WebViewScreenState extends State<WebViewScreen>
   String _currentWeek = 'ملفات';
   bool _isLoginPage = false;
   String? _savedMoodleSession;
+  late String _activeLmsHost;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeLmsHost = StorageService.instance.getActiveLmsHost();
+  }
+
+  void _updateActiveLmsHost(WebUri? url) {
+    final host = url?.host;
+    if (host != null && host.contains('lms-') && host.endsWith('.zad-academy.com')) {
+      if (_activeLmsHost != host) {
+        _activeLmsHost = host;
+        StorageService.instance.setActiveLmsHost(host);
+        debugPrint('ZadBridge: Active LMS batch host updated to: $host');
+      }
+    }
+  }
 
   bool _checkIsLoginUrl(WebUri? url) {
     if (url == null) return false;
@@ -46,11 +66,14 @@ class WebViewScreenState extends State<WebViewScreen>
     }
   }
 
-  /// Reloads the initial login/home URL
+  /// Reloads the active LMS batch dashboard
   void loadHomeUrl() {
+    final host = _activeLmsHost.isNotEmpty
+        ? _activeLmsHost
+        : StorageService.instance.getActiveLmsHost();
     _webViewController?.loadUrl(
       urlRequest: URLRequest(
-        url: WebUri(AppConstants.loginUrl),
+        url: WebUri('https://$host/'),
       ),
     );
   }
@@ -82,7 +105,11 @@ class WebViewScreenState extends State<WebViewScreen>
               // WebView
               InAppWebView(
                 initialUrlRequest: URLRequest(
-                  url: WebUri(AppConstants.loginUrl),
+                  url: WebUri(
+                    StorageService.instance.getActiveLmsHost().isNotEmpty
+                        ? 'https://${StorageService.instance.getActiveLmsHost()}/'
+                        : AppConstants.loginUrl,
+                  ),
                 ),
                 initialSettings: InAppWebViewSettings(
                   javaScriptEnabled: true,
@@ -126,6 +153,7 @@ class WebViewScreenState extends State<WebViewScreen>
                   debugPrint('ZadBridge [JS Console]: ${consoleMessage.messageLevel} | ${consoleMessage.message}');
                 },
                 onLoadStart: (controller, url) {
+                  _updateActiveLmsHost(url);
                   final isLogin = _checkIsLoginUrl(url);
                   if (_isLoginPage != isLogin) {
                     setState(() => _isLoginPage = isLogin);
@@ -137,9 +165,11 @@ class WebViewScreenState extends State<WebViewScreen>
                   });
                 },
                 onUpdateVisitedHistory: (controller, url, isReload) {
+                  _updateActiveLmsHost(url);
                   _updateLoginState(url);
                 },
                 onLoadStop: (controller, url) async {
+                  _updateActiveLmsHost(url);
                   setState(() {
                     _isLoading = false;
                     _progress = 1.0;
@@ -167,7 +197,7 @@ class WebViewScreenState extends State<WebViewScreen>
                     // Debug active cookies in WKHTTPCookieStore
                     try {
                       final cookies = await CookieManager.instance().getCookies(
-                        url: url ?? WebUri(AppConstants.baseUrl),
+                        url: url ?? WebUri('https://$_activeLmsHost'),
                       );
                       final cookieStr = cookies.map((c) => '${c.name}=${c.value}').join('; ');
                       debugPrint('ZadBridge [iOS Cookies @ ${url?.host}]: $cookieStr');
@@ -190,52 +220,17 @@ class WebViewScreenState extends State<WebViewScreen>
                   final url = request.url.toString();
                   final fileName = request.suggestedFilename ??
                       url.split('/').last.split('?').first;
-
-                  debugPrint('ZadBridge: Download request: $url → $fileName');
-
-                  await DownloadManager.instance.startDownload(
-                    url: url,
-                    fileName: fileName,
-                    semester: _currentSemester,
-                    course: _currentCourse,
-                    week: _currentWeek,
-                  );
-
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'جاري تحميل: $fileName',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: AppConstants.primaryDark,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      duration: const Duration(seconds: 3),
-                      action: SnackBarAction(
-                        label: 'التنزيلات',
-                        textColor: AppConstants.secondaryLight,
-                        onPressed: () {
-                          // Switch to downloads tab via the parent navigator
-                          _switchToDownloadsTab(context);
-                        },
-                      ),
-                    ),
-                  );
+                  _triggerDownload(url: url, fileName: fileName);
                 },
                 shouldOverrideUrlLoading: (controller, navigationAction) async {
                   final url = navigationAction.request.url?.toString() ?? '';
+                  _updateActiveLmsHost(navigationAction.request.url);
 
                   // Handle YouTube links — save as bookmark
                   if (JsBridge.isYouTubeUrl(url)) {
-                    await DownloadManager.instance.startDownload(
+                    _triggerDownload(
                       url: url,
                       fileName: 'youtube_${JsBridge.extractYouTubeVideoId(url)}',
-                      semester: _currentSemester,
-                      course: _currentCourse,
-                      week: _currentWeek,
                       title: 'فيديو يوتيوب',
                     );
                     return NavigationActionPolicy.CANCEL;
@@ -244,13 +239,7 @@ class WebViewScreenState extends State<WebViewScreen>
                   // Handle downloadable files
                   if (JsBridge.isDownloadableUrl(url)) {
                     final fileName = url.split('/').last.split('?').first;
-                    await DownloadManager.instance.startDownload(
-                      url: url,
-                      fileName: fileName,
-                      semester: _currentSemester,
-                      course: _currentCourse,
-                      week: _currentWeek,
-                    );
+                    _triggerDownload(url: url, fileName: fileName);
                     return NavigationActionPolicy.CANCEL;
                   }
 
@@ -381,11 +370,11 @@ class WebViewScreenState extends State<WebViewScreen>
         try {
           resolvedUri = Uri.parse(locationHeader);
           if (!resolvedUri.hasScheme) {
-            final base = response.url ?? WebUri(AppConstants.baseUrl);
+            final base = response.url ?? WebUri('https://$_activeLmsHost');
             resolvedUri = base.uriValue.resolve(locationHeader);
           }
         } catch (_) {
-          resolvedUri = Uri.parse(AppConstants.baseUrl);
+          resolvedUri = Uri.parse('https://$_activeLmsHost');
         }
 
         final targetUrl = resolvedUri.toString();
@@ -402,7 +391,7 @@ class WebViewScreenState extends State<WebViewScreen>
 
           if (sessionVal == null || sessionVal.isEmpty) {
             final cookies = await CookieManager.instance().getCookies(
-              url: WebUri(AppConstants.baseUrl),
+              url: WebUri('https://$_activeLmsHost'),
             );
             final mCookie = cookies.where((c) => c.name == 'MoodleSession').firstOrNull;
             sessionVal = mCookie?.value ?? _savedMoodleSession;
@@ -472,21 +461,34 @@ class WebViewScreenState extends State<WebViewScreen>
 
         final expireTime = DateTime.now().add(const Duration(days: 30)).millisecondsSinceEpoch;
 
-        // 1. Host-only for lms-ar121.zad-academy.com
+        // 1. Host-only for active LMS batch host
         await cookieManager.setCookie(
-          url: WebUri(AppConstants.baseUrl),
+          url: WebUri('https://$_activeLmsHost'),
           name: name,
           value: value,
-          domain: 'lms-ar121.zad-academy.com',
+          domain: _activeLmsHost,
           path: path ?? '/',
           isSecure: isSecure,
           isHttpOnly: isHttpOnly,
           expiresDate: expireTime,
         );
 
+        if (_activeLmsHost != 'lms-ar121.zad-academy.com') {
+          await cookieManager.setCookie(
+            url: WebUri('https://lms-ar121.zad-academy.com'),
+            name: name,
+            value: value,
+            domain: 'lms-ar121.zad-academy.com',
+            path: path ?? '/',
+            isSecure: isSecure,
+            isHttpOnly: isHttpOnly,
+            expiresDate: expireTime,
+          );
+        }
+
         // 2. Wildcard for .zad-academy.com (all subdomains)
         await cookieManager.setCookie(
-          url: WebUri(AppConstants.baseUrl),
+          url: WebUri('https://$_activeLmsHost'),
           name: name,
           value: value,
           domain: '.zad-academy.com',
@@ -511,6 +513,81 @@ class WebViewScreenState extends State<WebViewScreen>
     } catch (e) {
       debugPrint('ZadBridge: Cookie sync error: $e');
     }
+  }
+
+  /// Triggers a download and displays user feedback without blocking WebView execution
+  void _triggerDownload({
+    required String url,
+    required String fileName,
+    String? title,
+  }) {
+    debugPrint('ZadBridge: Triggering download: $url → $fileName');
+    DownloadManager.instance.startDownload(
+      url: url,
+      fileName: fileName,
+      semester: _currentSemester,
+      course: _currentCourse,
+      week: _currentWeek,
+      title: title,
+    );
+
+    if (!context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    // Clear any previous snackbars so they don't queue up or stick on screen
+    messenger.clearSnackBars();
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(
+              Icons.downloading_rounded,
+              color: AppConstants.secondaryLight,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'جاري تحميل: $fileName',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppConstants.primaryDark,
+        behavior: SnackBarBehavior.floating,
+        elevation: 6,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(milliseconds: 2200),
+        dismissDirection: DismissDirection.horizontal,
+        action: SnackBarAction(
+          label: 'التنزيلات',
+          textColor: AppConstants.secondaryLight,
+          onPressed: () {
+            messenger.hideCurrentSnackBar();
+            _switchToDownloadsTab(context);
+          },
+        ),
+      ),
+    );
+
+    // Guaranteed auto-dismiss fallback timer (after 2.5 seconds)
+    // Ensures the toast disappears on all devices even if OEM accessibility intercepts it
+    Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        messenger.hideCurrentSnackBar();
+      }
+    });
   }
 
   /// Switches the parent MainNavigationScreen to Downloads tab (index 1)

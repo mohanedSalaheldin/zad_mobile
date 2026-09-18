@@ -204,6 +204,17 @@ class StorageService {
     await _settingsBox.put('pdfViewerPreference', pref);
   }
 
+  /// Active LMS batch host (e.g., 'lms-ar121.zad-academy.com', 'lms-ar101.zad-academy.com')
+  String getActiveLmsHost() {
+    return _settingsBox.get('activeLmsHost', defaultValue: 'lms-ar121.zad-academy.com') as String;
+  }
+
+  Future<void> setActiveLmsHost(String host) async {
+    if (host.isNotEmpty && host != getActiveLmsHost()) {
+      await _settingsBox.put('activeLmsHost', host);
+    }
+  }
+
   DownloadItem? findByTaskId(String taskId) {
     try {
       return getAllDownloads().firstWhere((d) => d.taskId == taskId);

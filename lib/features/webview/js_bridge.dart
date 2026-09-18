@@ -116,8 +116,20 @@ class JsBridge {
       };
 
       // Notify Flutter that bridge is ready
-      if (window.flutter_inappwebview) {
-        window.flutter_inappwebview.callHandler('onBridgeReady', true);
+      function notifyBridgeReady() {
+        try {
+          if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
+            window.flutter_inappwebview.callHandler('onBridgeReady', true);
+            return true;
+          }
+        } catch(e) {}
+        return false;
+      }
+
+      if (!notifyBridgeReady()) {
+        window.addEventListener('flutterInAppWebViewPlatformReady', function() {
+          notifyBridgeReady();
+        });
       }
     })();
   ''';
