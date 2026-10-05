@@ -12,6 +12,8 @@ import 'package:zad_mobile/features/library/audio_player_screen.dart';
 import 'package:zad_mobile/features/library/video_player_screen.dart';
 import 'package:zad_mobile/features/library/pdf_helper.dart';
 import 'package:zad_mobile/features/settings/settings_screen.dart';
+import 'package:zad_mobile/shared/services/share_service.dart';
+import 'package:zad_mobile/shared/services/review_service.dart';
 
 /// Full-page Downloads screen used as a Navigation tab.
 class DownloadsPage extends StatefulWidget {
@@ -30,9 +32,23 @@ class _DownloadsPageState extends State<DownloadsPage>
   String? _expandedCourse;
 
   @override
+  void initState() {
+    super.initState();
+    ReviewService.triggerInAppReview();
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
-    return BlocBuilder<DownloadsCubit, DownloadsState>(
+    return BlocConsumer<DownloadsCubit, DownloadsState>(
+      listener: (context, state) {
+        final completedCount = state.allDownloads
+            .where((d) => d.status == DownloadStatus.complete)
+            .length;
+        if (completedCount >= 3) {
+          ReviewService.triggerInAppReview();
+        }
+      },
       builder: (context, state) {
         final grouped = state.groupedDownloads;
         final maxGb = state.maxStorageGb;
@@ -68,6 +84,11 @@ class _DownloadsPageState extends State<DownloadsPage>
                 ],
               ),
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.share_rounded, color: Colors.white),
+                  tooltip: 'شارك التطبيق',
+                  onPressed: () => ShareService.shareApp(),
+                ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, color: Colors.white),
                   tooltip: 'الإعدادات',

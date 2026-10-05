@@ -5,6 +5,7 @@ import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/features/library/cubit/audio_player_cubit.dart';
 import 'package:zad_mobile/features/library/cubit/audio_player_state.dart';
 import 'package:zad_mobile/shared/services/audio_handler.dart';
+import 'package:zad_mobile/shared/services/review_service.dart';
 
 class AudioPlayerScreen extends StatelessWidget {
   final String filePath;
@@ -41,6 +42,7 @@ class _AudioPlayerViewState extends State<_AudioPlayerView>
   @override
   void initState() {
     super.initState();
+    ReviewService.triggerInAppReview();
     _rotationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 12),

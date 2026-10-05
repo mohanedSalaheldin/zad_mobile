@@ -4,6 +4,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/features/library/pdf_reader_screen.dart';
 import 'package:zad_mobile/shared/services/storage_service.dart';
+import 'package:zad_mobile/shared/services/review_service.dart';
 
 class PdfHelper {
   /// Opens a PDF file according to user preference:
@@ -39,6 +40,7 @@ class PdfHelper {
       return;
     }
 
+    ReviewService.triggerInAppReview();
     if (pref == 'internal') {
       _openInternal(context, filePath: filePath, title: title);
     } else {

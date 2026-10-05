@@ -7,6 +7,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/features/library/cubit/video_player_cubit.dart';
 import 'package:zad_mobile/features/library/cubit/video_player_state.dart';
+import 'package:zad_mobile/shared/services/review_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String? filePath;
@@ -30,6 +31,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    ReviewService.triggerInAppReview();
     // Allow landscape and portrait
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeRight,

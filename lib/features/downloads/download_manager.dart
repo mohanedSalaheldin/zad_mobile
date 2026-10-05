@@ -5,6 +5,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:zad_mobile/shared/services/storage_service.dart';
+import 'package:zad_mobile/shared/services/notification_service.dart';
+import 'package:zad_mobile/shared/services/review_service.dart';
 import 'package:zad_mobile/features/downloads/download_model.dart';
 
 @pragma('vm:entry-point')
@@ -84,6 +86,8 @@ class DownloadManager {
       } catch (_) {}
     }
 
+    final wasAlreadyComplete = item.status == DownloadStatus.complete;
+
     final updated = item.copyWith(
       progress: progress,
       status: newStatus,
@@ -96,6 +100,14 @@ class DownloadManager {
 
     // Refresh active downloads
     _refreshActiveDownloads();
+
+    // Trigger local notification and in-app review
+    if (newStatus == DownloadStatus.complete && !wasAlreadyComplete) {
+      NotificationService.instance.showDownloadCompletedNotification(
+        title: item.title,
+      );
+      ReviewService.triggerInAppReview();
+    }
   }
 
   void _refreshActiveDownloads() {

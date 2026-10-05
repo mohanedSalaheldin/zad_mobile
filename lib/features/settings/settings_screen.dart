@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:in_app_update/in_app_update.dart';
 import 'package:zad_mobile/app/constants.dart';
 import 'package:zad_mobile/shared/services/storage_service.dart';
+import 'package:zad_mobile/shared/services/share_service.dart';
+import 'package:zad_mobile/shared/services/review_service.dart';
+import 'package:zad_mobile/shared/services/update_service.dart';
 import 'package:zad_mobile/features/settings/legal_viewer_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -248,6 +252,87 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
 
+            // ─── Share & Rating Section ───
+            _buildSectionHeader('المشاركة والتقييم', Icons.favorite_rounded),
+            const SizedBox(height: 8),
+            _buildCard(
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.share_rounded,
+                    color: AppConstants.primaryColor,
+                  ),
+                  title: const Text(
+                    'شارك التطبيق مع زملائك في زاد',
+                    style: TextStyle(
+                      color: AppConstants.textDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'دعوة زملائك في الأكاديمية لتحميل وتثبيت التطبيق',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppConstants.textMuted,
+                    size: 22,
+                  ),
+                  onTap: () => ShareService.shareApp(),
+                ),
+                const Divider(color: AppConstants.dividerColor),
+                ListTile(
+                  leading: const Icon(
+                    Icons.star_rounded,
+                    color: AppConstants.secondaryColor,
+                  ),
+                  title: const Text(
+                    'قيم التطبيق على Google Play',
+                    style: TextStyle(
+                      color: AppConstants.textDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'ادعم استمرار التطبيق بتقييم 5 نجوم وكتابة رأيك الطيب',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppConstants.textMuted,
+                    size: 22,
+                  ),
+                  onTap: () => ReviewService.requestInAppReviewDirectly(),
+                ),
+                const Divider(color: AppConstants.dividerColor),
+                ListTile(
+                  leading: const Icon(
+                    Icons.system_update_rounded,
+                    color: AppConstants.accentColor,
+                  ),
+                  title: const Text(
+                    'التحقق من وجود تحديثات',
+                    style: TextStyle(
+                      color: AppConstants.textDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'فحص توفر إصدار أحدث على متجر Google Play',
+                    style: TextStyle(color: AppConstants.textMuted, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppConstants.textMuted,
+                    size: 22,
+                  ),
+                  onTap: _manualCheckForUpdate,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
             // ─── About Section ───
             _buildSectionHeader('عن التطبيق', Icons.info_outline_rounded),
             const SizedBox(height: 8),
@@ -469,5 +554,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _manualCheckForUpdate() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('جاري التحقق من وجود تحديثات...'),
+          ],
+        ),
+        backgroundColor: AppConstants.primaryDark,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+
+    final info = await UpdateService.checkForUpdate(triggerUpdate: true);
+    if (!mounted) return;
+
+    if (info == null ||
+        info.updateAvailability != UpdateAvailability.updateAvailable) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('أنت تستخدم أحدث إصدار متوفر بالفعل! 🎉'),
+          backgroundColor: AppConstants.primaryColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 }
