@@ -6,19 +6,22 @@ class PermissionService {
   static PermissionService get instance => _instance ??= PermissionService._();
   PermissionService._();
 
+  /// Storage permission is only needed on Android 12 and below.
+  /// On Android 13+, the app uses app-specific directories (no permission needed)
+  /// and system pickers for any media selection (no permission needed).
   Future<bool> requestStoragePermission() async {
     if (Platform.isAndroid) {
-      // Android 13+ uses granular permissions
       final sdkInt = int.tryParse(
         await _getAndroidSdkVersion(),
       );
 
       if (sdkInt != null && sdkInt >= 33) {
-        // Android 13+ doesn't need WRITE_EXTERNAL_STORAGE
-        // App-specific directory access is automatic
+        // Android 13+: app-specific directory access is automatic,
+        // and we use system pickers — no storage permission needed.
         return true;
       }
 
+      // Android 12 and below: request legacy storage permission
       final status = await Permission.storage.request();
       return status.isGranted;
     }
